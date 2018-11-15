@@ -1,0 +1,324 @@
+Tube Challenge Route Finder
+===========================
+Hassan Chagani
+v1.0 2018-11-15
+
+
+Contents
+--------
+[INT] Introduction
+[REQ] Requirements
+[IIN] Installation Instructions
+[UIN] Usage Instructions
+[GAD] Genetic Algorithm Details
+[FLS] File List
+[VHI] Version History & Known Issues
+
+
+[INT] Introduction
+------------------
+The Tube Challenge is a competition to visit 270 London Underground stations in
+the fastest time. The current World record is 16 hours, 20 minutes and 27
+seconds, held by Geoff Marshall and Anthony Smith (1 October 2013).
+
+The challenge is similar to the Travelling Salesman Problem (TSP), in which a
+salesman needs to visit a set number of locations following the shortest
+possible route. As the number of possible routes is given by n! where n is the
+number of locations to visit, determining the optimal route by brute force
+becomes impractical for high n. One technique is to find a solution close to
+the optimum by employing a genetic algorithm.
+
+This program implements a genetic algorithm to find the quickest route between
+a list of London Undergrond stations.
+
+
+[REQ] Requirements
+------------------
+Tested with the Anaconda Python 3.6.3 distribution, with packages:
+
+json 2.0.9
+matplotlib 2.1.0
+numpy 1.13.3
+pandas 0.20.3
+re 2.2.1
+requests 2.18.4
+scipy 0.19.1
+
+
+[IIN] Installation Instructions
+-------------------------------
+Clone this repository from the command line:
+
+git clone https://github.com/hchagani/tubeChallenge_routeFinder
+
+
+[UIN] Usage Instructions
+------------------------
+Run from the command line with the following:
+
+python tube_challenge_route_finder_ui.py
+
+Then follow onscreen instructions. There are three subdirectories (sample files
+are stored in each directory as examples):
+
+./station_lists/
+    Contains txt files with a list of station names. Station names must be
+    spelled correctly otherwise the program will return an error after querying
+    the Transport for London (TfL) Application Programming Interface (API).
+    Each station name must be on a separate line, and at least three stations
+    must be included. The file name suffix must be txt otherwise the script
+    will not find the file. A sample file containing stations with the word
+    "Park" is included in this directory as parkLUStationsList.txt .
+
+./station_matrices/
+    Contains csv files of journey times between stations from previous
+    executions of this program. This is to allow the user to repeat the
+    execution without querying the TfL API to get journey times, thus saving
+    time. File name format is as follows:
+        <date>_<time>_<number of stations>stationMatrix.csv
+    A sample file containing 24 stations (which include the word "Park") is
+    included in this directory as 20181121_1200_24stationMatrix.csv .
+
+./output_routes/
+    Contains plots and routes as a result of running the program. The plots are
+    saved in png format. They give the following information so that the user
+    can assess the performance of the genetic algorithm and make changes to its
+    parameters in a future iteration should it be deemed necessary:
+        1. Duration of best route per generation.
+            - Should be modelled by exponential decay.
+            - Exponential decay function fitted to data to give user an idea of
+              plateau time and decay constant.
+        2. Distribution of route durations in final generation.
+            - Gives user the range of route durations in final generation and
+              distribution of these durations.
+        3. Mean duration and standard deviation from mean per generation.
+            - Standard deviation represented by green shaded area around black
+              line that represents the mean.
+            - Gives user an idea of the spread of route durations with
+              duration.
+        4. Cumulative Distribution Function (CDF) of final generation route
+           fitnesses.
+            - Should be a straight line if all routes are of identical
+              durations.
+            - Calculated \chi^2/NDF gives user an idea of the homogeneity of
+              route durations.
+    Also contains dat files with details of the best route from the final
+    generation.
+    File name formats for both files is as follows:
+        <date>_<time>_<random_seed>.<suffix>
+    Sample files 20181121_1200_5334050402357843064.png and
+    20181121_1200_5334050402357843064.dat are included in this directory.
+
+Upon execution, a check will be made to determine whether a station matrix file
+exists. if this file exists, the following menu will be presented:
+
+---------------------------
+Tube Challenge Route Finder
+---------------------------
+Latest station matrix file: ./station_matrices/20181121_1200_24stationMatrix.csv
+Please enter an option:
+[0]	Use this file
+[1]	Use alternate file
+[2]	Create new file
+(q to quit):
+
+Using an alternate file will present a list of other csv files in the
+./station_matrices/ directory. Should there be no csv file in the directory or
+the option to create a new file is selected, a new station matrix file will be
+created:
+
+---------------------
+Create Station Matrix
+---------------------
+Latest station list file: ./station_lists/parkLUStationsList.txt
+Would you like to use this file? (q to quit)
+
+Entering N or n will present a list of txt files to select from in the
+./station_lists/ directory. Once a station list file has been selected, station
+names will be printed out as the TfL API is queried to convert names into icsID
+numbers. Should there be any ambiguous results, the user will be asked to
+select from a possible list of stations. For example:
+
+Wimbledon returned several results:
+[0]	Wimbledon
+[1]	South Wimbledon Underground Station
+[2]	Wimbledon Park Underground Station
+Please select station:
+
+The user will then be asked to select a start time and date:
+
+-----------------
+Set Time and Date
+-----------------
+Please select an option:
+[0]	Change time	12:00
+[1]	Change date	2018-11-21
+[2]	Accept these values
+(q to quit):
+
+The program will then query the TfL journey planner API to create a matrix of
+journey times between each station. This will be saved in the
+./station_matrices/ directory for future use.
+
+Once the station matrix file has been selected or created, the user is asked to
+select a starting station, and then confirm their choice. The user is then
+presented with a list of input parameters for the genetic algorithm:
+
+----------------------------
+Genetic Algorithm Parameters
+----------------------------
+[0]	Number of generations: 100
+[1]	Number of routes per generation: 100
+[2]	Number of elite routes to pass down to the next generation: 10
+[3]	Mutation rate: 0.01
+[4]	Random seed: 5334050402357843064
+[5]	Accept parameters
+
+Once parameters have been accepted, the genetic algorithm runs. A plot of some
+statistical values from the algorithm is presented, and is saved in the
+./output_routes/ directory. Once this plot is closed, journey details for the
+best route in the final generation are gathered by querying the TfL Journey
+Planner API. This route is printed to the terminal and saved in the
+./output_routes/ directory. The program then returns to the main menu and the
+process can be repeated.
+
+
+[GAD] Genetic Algorithm Details
+-------------------------------
+Two classes are defined: Station and Route.
+
+Objects that belong to the Station class are assigned name and ID number
+attributes on creation. The name is the actual name of the station and ID
+number is that used by the TfL API to obtain route information. The SetTimeTo()
+function assigns joruney times between different Station objects.
+
+Route objects comprise of a list of Station objects in the order in which they
+are listed. On creation, the total journey duration between Station objects is
+calculated and becomes an attribute.
+
+The following description covers the functions relevant to implementing the
+genetic algorithm, which are contained in the source code file
+gen_alg_LUstations.py .
+
+The GeneticAlgorithm() function is called once the genetic algorithm parameters
+have been accepted. It takes 7 arguments:
+	station_list: list of Station objects.
+	first_station: Station object that has been selected as start station.
+	n_generations: Number of generations to simulate.
+	pop_size: Number of Route objects to generate per generation.
+	elite_size: Number of elite Route objects to pass onto next generation.
+	mutation_rate: Mutation rate.
+	random_seed: Random seed.
+
+The random seed is set. Then the initial population of Route objects is created
+by calling the CreateInitialPopulation(pop_size, station_list, first_station)
+function. This function generates a list of Routes objects comprising of a
+random list of Station objects, with the first station fixed. This returns an
+initial population, which is sorted by duration by calling the
+SortRoutes(population) function.
+
+The CreateNextGeneration(population, elite_size, mutation_rate) function is
+then called for n_generations. This function returns the next generation in the
+same format as population, overwriting this variable.
+
+The CreateNextGeneration() function initially calls the
+SetParentsFitness(population) function to determine route fitness as the
+reciprocal of the duration. The Cumulative Distribution Function (CDF) is
+calculated to enable fitness proportion selection when choosing parents for
+next generation procreation. Returns parents as pandas dataframe.
+
+The Procreate(parents, elite_size) function is then called. Initially, the
+fastest routes of number elite_size automatically pass onto the next
+generation. This elitism helps to ensure that the fastest routes are not lost.
+
+The remaining routes are derived by splicing Station objects from mother and
+father pairs. These are selected by calling the
+SelectParents(parents, elite_size) function, which selects pairs of parents
+based on fitness proportion selection (i.e. the quickest routes have a higher
+chance of selection) using the CDF. The function also ensures that the mother
+and father are not identical.
+
+At the very least, the first and last Station objects that will form the child
+are taken from the mother. The father then contributes a random slice of
+Station objects to the child. Station objects that lie within these bounds are
+not passed on to the child from the mother. Instead they are passed on to the
+child from the father according to their order and position in the father's
+list of Station objects. For example:
+
+mother = [A, B, C, D, E, F]
+father = [A, F, B, E, D, C]
+
+Assuming a random slice [B, E, D] will be passed on from father to child, the
+mother's contribution becomes [A, C, F]. Now splice Station objects from father
+to complete child:
+
+child = [A, C, B, E, D, F]
+
+The Procreate() function returns a list of children that form the next
+generation of Route objects. To avoid reaching a false minimum, the
+Mutate(children, mutation_rate) function is called. This swaps positions of two
+Station objects in a Route object according to the mutation rate. In other
+words, a mutation rate of 0.01 means that 1 in every hundred children will
+undergo this mutation. The Station objects to be swapped are selected at
+random.
+
+The children are then sorted by duration by calling the SortRoute() function
+and this list is returned as the new population to start the process again. The
+process is repeated n_generations times. The duration of the best route, mean
+duration and standard deviation from the mean duration are determined and
+stored for each generation for later analysis. Additionally, the Route objects
+that comprise the final generation are also stored.
+
+
+[FLS] File List
+---------------
+Source code:
+1. file_manip.py
+	Functions for manipulation of files and file names.
+2. gen_alg_LUstations.py
+	Genetic algorithm functions.
+3. misc_fun.py
+	Miscellaneous functions.
+4. station_route.py
+	Station and Route class definitions.
+5. tube_challenge_route_finder_ui.py
+	User interface functions.
+6. vis_stat_fun.py
+	Visualisation and statistics functions.
+
+Other files:
+7. LICENSE
+	GNU General Public License v3.0 details.
+8. README
+	This file.
+9. ./output_routes/20181121_1200_5334050402357843064.png
+	Example of plots from program execution.
+10. ./output_routes/20181121_1200_5334050402357843064.dat
+	Best route details from previous program execution.
+11. ./station_lists/parkLUStationsList.txt
+	Example of list of station names.
+12. ./station_matrices/20181121_1200_24stationMatrix.csv
+	Example of matrix of journey times between stations.
+
+
+[VHI] Version History & Known Issues
+------------------------------------
+v1.0
+First version.
+Issues:
+1. Tube challenge rules allow a participant to either arrive or depart a London
+Underground station by tube train. However, both are not required. For example,
+one could take the Metropolitan line to North Harrow, leave North Harrow
+station, run to West Harrow station and then board the Metropolitan line from
+West Harrow. This counts as having visited both stations and is the optimal
+route compared with changing trains at Harrow-on-the-Hill. The algorithm
+currently does not take out of station interchanges like this into account and
+therefore does not provide the most optimal journey times between all stations.
+2. The program does not correct for a route that may end with an out of station
+interchange. For example, if the last stage of the route is Bakerloo line to
+Kenton station followed by a run to Northwick Park station, Northwick Park has
+not been visited until one departs by tube train from that station and arrives
+at either Harrow-on-the-Hill or Preston Road.
+3. If running, interchange times are overstated by the TfL journey planner API.
+Therefore, journey times between stations that require interchanges might be
+faster than those stated.
